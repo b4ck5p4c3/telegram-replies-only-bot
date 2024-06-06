@@ -11,23 +11,23 @@ jobs:
     name: Deploy
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Create wrangler.toml
-        uses: bluwy/substitute-string-action@v1
+        uses: bluwy/substitute-string-action@v3
         with:
           _input-file: 'wrangler.example.toml'
           _output-file: 'wrangler.toml'
           _format-key: '%%key%%'
           LOGS: ${{ secrets.LOGS }}
           SETTINGS: ${{ secrets.SETTINGS }}
-          HOOK_PATH: ${{ secrets.HOOK_PATH }}
-          TELEGRAM_API_TOKEN: ${{ secrets.TELEGRAM_API_TOKEN }}
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
           cache: 'npm'
 
       - name: Install
@@ -38,16 +38,19 @@ jobs:
 
       - name: Deploy
         id: deploy
-        uses: cloudflare/wrangler-action@2.0.0
+        uses: cloudflare/wrangler-action@v3
+        env:
+          HOOK_PATH: ${{ secrets.HOOK_PATH }}
+          TELEGRAM_API_TOKEN: ${{ secrets.TELEGRAM_API_TOKEN }}
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: --version
-          postCommands: |
-            text="$(wrangler publish)"
-            echo "::set-output name=value::${text##*$'\n'}"
+          secrets: |
+            HOOK_PATH
+            TELEGRAM_API_TOKEN
+          command: deploy
 
       - name: Check status
-        uses: srt32/uptime@master
+        uses: jtalk/url-health-check-action@v4
         with:
-          url-to-hit: ${{ steps.deploy.outputs.value }}/status
+          url: ${{ steps.deploy.outputs.deployment-url }}/status
